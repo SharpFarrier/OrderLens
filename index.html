@@ -2295,6 +2295,20 @@ function exportShiprocket() {
     const isCod = o.paymentType === 'cod';
     const totalWt = dim.weightKg ? (dim.weightKg * (o.qty || 1)) : '';
 
+    // ── Address splitting ─────────────────────────────────────
+    const fullAddress = (o.address || '').trim();
+    const midpoint = Math.ceil(fullAddress.length / 2);
+    let splitAt = midpoint;
+    for (let i = midpoint; i < fullAddress.length; i++) {
+      if (fullAddress[i] === ' ') { splitAt = i; break; }
+    }
+    const addrLine1 = fullAddress.slice(0, splitAt).trim();
+    const addrLine2 = fullAddress.slice(splitAt).trim();
+
+    // ── Phone — strip to last 10 digits ──────────────────────
+    const rawPhone = String(o.phone || '').replace(/\D/g, '');
+    const phone10 = rawPhone.length > 10 ? rawPhone.slice(-10) : rawPhone;
+
     return {
       'order invoice number': o.orderId,
       'order invoice value': o.amount || '',
@@ -2312,14 +2326,14 @@ function exportShiprocket() {
       'pickup contact person number': 8999198256,
       'pickup contact person email': 'logistics@sabiwabi.in',
       'recipient warehouse code': '',
-      'recipient warehouse name': '',
-      'recipient address line1': o.address || '',
-      'recipient address line2': '',
+      'recipient warehouse name': o.customerName || '',
+      'recipient address line1': addrLine1,
+      'recipient address line2': addrLine2,
       'recipient city': o.city || '',
       'recipient state': o.state || '',
       'recipient pincode': o.pincode || '',
       'recipient contact person name': o.customerName || '',
-      'recipient contact person number': o.phone || '',
+      'recipient contact person number': phone10,
       'recipient contact person email': 'logistics@sabiwabi.in',
       'cod': isCod ? 'yes' : 'no',
       'cod mode': '',
