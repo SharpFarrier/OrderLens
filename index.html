@@ -122,6 +122,16 @@
   .badge-tracked { background: rgba(46,204,138,0.15); color: var(--green); }
   .badge-cancelled { background: rgba(255,79,106,0.12); color: var(--red); }
   .badge-unserviceable { background: rgba(245,200,66,0.1); color: var(--yellow); }
+
+  .upload-card.locked { opacity: 0.45; pointer-events: none; }
+  .upload-card.locked::after {
+    content: '🔒 Sign in to upload';
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-family: var(--font-mono); color: var(--text2);
+    background: rgba(10,10,15,0.7); border-radius: 12px;
+  }
+  .action-locked { opacity: 0.4; pointer-events: none; cursor: not-allowed; }
+
   .badge-manual { background: rgba(123,95,255,0.15); color: var(--accent2); }
   .badge-replacement { background: rgba(255,153,0,0.15); color: #ff9900; }
   .badge-cod { background: rgba(245,200,66,0.15); color: var(--yellow); }
@@ -954,6 +964,7 @@ function suggestCourier(order) {
 }
 
 function runAutoAssign() {
+  if (!driveReady('auto-assigning couriers')) return;
   DB.orders.forEach(o => {
     const s = suggestCourier(o);
     o.suggestedCourier = s.courier;
@@ -1239,6 +1250,7 @@ function handleDrop(e, p) { e.preventDefault(); document.getElementById('drop-'+
 function handleFile(e, p) { if (e.target.files[0]) processFile(e.target.files[0], p); }
 
 function processFile(file, platform) {
+  if (!driveReady('uploading orders')) return;
   const ext = file.name.split('.').pop().toLowerCase();
   const statusEl = document.getElementById('status-' + platform);
   statusEl.textContent = '⏳ Parsing...';
@@ -1292,12 +1304,25 @@ function mergeOrders(result, platform, fileName, statusEl) {
   });
 
   DB.uploadHistory.unshift({ platform, fileName, parsed: result.orders.length, added: newAdded, dupes, time: new Date().toLocaleTimeString() });
-  saveState();
+  saveLocalFallback();
   updateHeaderStats();
   renderUploadHistory();
-  statusEl.textContent = `✓ ${newAdded} added, ${dupes} dupes skipped`;
-  statusEl.className = 'upload-status ok';
-  toast(`✓ ${newAdded} new orders added from ${platform}`, 'success');
+  statusEl.textContent = `⏳ ${newAdded} added — syncing to Drive...`;
+  statusEl.className = 'upload-status';
+  setSyncState('syncing', 'Saving upload...');
+  // Force immediate Drive save — don't wait for debounce
+  if (saveTimer) clearTimeout(saveTimer);
+  driveSaveDB().then(ok => {
+    if (ok) {
+      statusEl.textContent = `✓ ${newAdded} added — saved to Drive (${dupes} dupes skipped)`;
+      statusEl.className = 'upload-status ok';
+      toast(`✓ ${newAdded} orders synced to Drive`, 'success');
+    } else {
+      statusEl.textContent = `⚠ ${newAdded} added locally — Drive save failed. Retry sync.`;
+      statusEl.className = 'upload-status err';
+      toast('⚠ Orders added but Drive save failed — press 🔄 Sync', 'error');
+    }
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -1403,10 +1428,17 @@ function isActionable(o) {
 }
 
 function setOrderStatus(idx, status) {
+  if (!driveReady('updating order status')) return;
+  const o = DB.orders[idx];
+  const label = status === 'cancelled' ? 'Cancel' : 'Mark as Unserviceable';
+  const msg = `${label} order ${o.orderId}? This removes it from the assign queue.`;
+  if (!confirm(msg)) return;
   DB.orders[idx].status = status;
-  saveState();
+  saveLocalFallback();
   updateHeaderStats();
   renderAssign();
+  if (saveTimer) clearTimeout(saveTimer);
+  driveSaveDB();
   toast(`Order marked as ${status}`, status === 'cancelled' || status === 'unserviceable' ? 'info' : 'success');
 }
 
@@ -1461,6 +1493,7 @@ function renderAssign() {
 }
 
 function overrideCourier(idx, sel) {
+  if (!driveReady('changing courier assignment')) return;
   const val = sel.value;
   DB.orders[idx].courier = val;
   DB.orders[idx].manualOverride = val !== DB.orders[idx].suggestedCourier;
@@ -1489,14 +1522,18 @@ function filterAssignCourier(val) {
 }
 
 function confirmAssignments() {
+  if (!driveReady('confirming assignments')) return;
   let count = 0;
   DB.orders.forEach(o => {
     if (isActionable(o)) { o.status = 'assigned'; count++; }
   });
-  saveState();
+  saveLocalFallback();
   updateHeaderStats();
-  toast(`✓ ${count} orders confirmed → ready for export`, 'success');
-  showPage('export');
+  if (saveTimer) clearTimeout(saveTimer);
+  driveSaveDB().then(() => {
+    toast(`✓ ${count} orders confirmed & synced to Drive`, 'success');
+    showPage('export');
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -1521,6 +1558,7 @@ function handleDropTracking(e) { e.preventDefault(); document.getElementById('dr
 function handleFileTracking(e) { if (e.target.files[0]) processTrackingFile(e.target.files[0]); }
 
 function processTrackingFile(file) {
+  if (!driveReady('uploading tracking IDs')) return;
   const reader = new FileReader();
   reader.onload = (e) => {
     const text = e.target.result;
@@ -1556,13 +1594,24 @@ function processTrackingFile(file) {
     });
 
     trackingHistory.unshift({ fileName: file.name, matched, written, notFound, time: new Date().toLocaleTimeString() });
-    saveState();
+    saveLocalFallback();
     updateHeaderStats();
     renderTrackingPage();
-
-    statusEl.textContent = `✓ ${written} AWBs written, ${notFound} not found`;
-    statusEl.className = 'upload-status ok';
-    toast(`✓ ${written} orders marked as tracked`, 'success');
+    statusEl.textContent = `⏳ ${written} AWBs written — syncing...`;
+    statusEl.className = 'upload-status';
+    setSyncState('syncing', 'Saving tracking data...');
+    if (saveTimer) clearTimeout(saveTimer);
+    driveSaveDB().then(ok => {
+      if (ok) {
+        statusEl.textContent = `✓ ${written} AWBs saved to Drive (${notFound} not matched)`;
+        statusEl.className = 'upload-status ok';
+        toast(`✓ ${written} tracking IDs synced to Drive`, 'success');
+      } else {
+        statusEl.textContent = `⚠ ${written} AWBs added locally — Drive save failed`;
+        statusEl.className = 'upload-status err';
+        toast('⚠ AWBs saved locally — Drive sync failed. Press 🔄 Sync', 'error');
+      }
+    });
   };
   reader.readAsText(file);
 }
@@ -1637,6 +1686,7 @@ function renderGuardrails() {
 }
 
 function saveGuardrails() {
+  if (!driveReady('saving guardrails')) return;
   DB.guardrails.divisor = parseFloat(document.getElementById('g-divisor').value) || 5000;
   DB.guardrails.threshold = parseFloat(document.getElementById('g-threshold').value) || 10;
   DB.guardrails.qtyThreshold = parseInt(document.getElementById('g-qty-threshold').value) || 1;
@@ -1658,6 +1708,7 @@ function saveGuardrails() {
 
 // SKU DIMS
 function addSkuDim() {
+  if (!driveReady('adding SKU dimensions')) return;
   const sku = document.getElementById('sku-code').value.trim();
   const l = parseFloat(document.getElementById('sku-l').value);
   const w = parseFloat(document.getElementById('sku-w').value);
@@ -1720,6 +1771,7 @@ function renderSkuList() {
 
 // PINCODE OVERRIDES
 function addPincodes() {
+  if (!driveReady('adding pincode overrides')) return;
   const raw = document.getElementById('pincode-paste').value;
   const courier = document.getElementById('pincode-courier').value;
   const pins = raw.split(/[\n,]+/).map(p => p.trim()).filter(p => /^\d{6}$/.test(p));
@@ -1825,6 +1877,7 @@ function exportCourier(courier) {
 }
 
 function exportBluedart() {
+  if (!driveReady('downloading Bluedart file')) return;
   const orders = DB.orders.filter(o => o.courier === 'bluedart' && isActionable(o));
   if (!orders.length) { toast('No orders assigned to Bluedart', 'error'); return; }
 
@@ -1894,12 +1947,12 @@ function exportBluedart() {
     };
   });
 
-  download(toCSV(rows), `bluedart_upload_${today()}.csv`);
+  safeDownload(toCSV(rows), `bluedart_upload_${today()}.csv`, 'downloading Bluedart file');
   saveState();
-  toast(`✓ ${orders.length} orders → Bluedart upload CSV ready`, 'success');
 }
 
 function exportShiprocket() {
+  if (!driveReady('downloading Shiprocket file')) return;
   const orders = DB.orders.filter(o => o.courier === 'delhivery' && isActionable(o));
   if (!orders.length) { toast('No orders assigned to Delhivery/Shiprocket', 'error'); return; }
 
@@ -1957,12 +2010,12 @@ function exportShiprocket() {
     };
   });
 
-  download(toCSV(rows), `shiprocket_delhivery_upload_${today()}.csv`);
+  safeDownload(toCSV(rows), `shiprocket_delhivery_upload_${today()}.csv`, 'downloading Shiprocket file');
   saveState();
-  toast(`✓ ${orders.length} orders → Shiprocket upload CSV ready`, 'success');
 }
 
 function exportInvoLens() {
+  if (!driveReady('downloading InvoLens export')) return;
   const orders = DB.orders.filter(o => o.courier && (isActionable(o) || o.status === 'tracked'));
   if (!orders.length) { toast('No assigned orders to export', 'error'); return; }
 
@@ -1991,11 +2044,11 @@ function exportInvoLens() {
     };
   });
 
-  download(toCSV(rows), `orderlens_involens_${today()}.csv`);
-  toast(`✓ ${orders.length} orders → InvoLens export ready`, 'success');
+  safeDownload(toCSV(rows), `orderlens_involens_${today()}.csv`, 'downloading InvoLens export');
 }
 
 function exportMasterCSV() {
+  if (!driveReady('downloading master CSV')) return;
   if (!DB.orders.length) { toast('No orders to export', 'error'); return; }
   const rows = DB.orders.map(o => ({
     'Order ID': o.orderId, 'Platform': o.platform, 'Customer': o.customerName,
@@ -2005,8 +2058,7 @@ function exportMasterCSV() {
     'Suggested': o.suggestedCourier, 'Override': o.manualOverride ? 'YES' : 'NO',
     'Status': o.status
   }));
-  download(toCSV(rows), `orderlens_master_${new Date().toISOString().slice(0,10)}.csv`);
-  toast('✓ Master CSV exported', 'success');
+  safeDownload(toCSV(rows), `orderlens_master_${new Date().toISOString().slice(0,10)}.csv`, 'downloading master CSV');
 }
 
 // ─────────────────────────────────────────────
@@ -2052,6 +2104,7 @@ function renderUploadHistory() {
 }
 
 function clearAllOrders() {
+  if (!driveReady('clearing orders')) return;
   if (!confirm('Clear all orders from the database? Cannot be undone.')) return;
   DB.orders = []; DB.uploadHistory = [];
   saveState(); updateHeaderStats(); renderUploadHistory();
@@ -2068,6 +2121,60 @@ function toast(msg, type='info') {
 
 // ─────────────────────────────────────────────
 
+
+
+
+// ─────────────────────────────────────────────
+// UI LOCK — visually disable all interactive elements when not authenticated
+// ─────────────────────────────────────────────
+function lockUI() {
+  document.querySelectorAll('.upload-card').forEach(el => el.classList.add('locked'));
+  document.querySelectorAll('.btn:not(.auth-btn)').forEach(el => el.classList.add('action-locked'));
+}
+
+function unlockUI() {
+  document.querySelectorAll('.upload-card').forEach(el => el.classList.remove('locked'));
+  document.querySelectorAll('.btn').forEach(el => el.classList.remove('action-locked'));
+}
+
+// ─────────────────────────────────────────────
+// AUTH GUARD — blocks all actions unless Drive is synced
+// ─────────────────────────────────────────────
+function driveReady(action) {
+  // action: human-readable description of what was attempted
+  if (!gToken) {
+    toast(`🔒 Sign in first — ${action} requires Drive sync`, 'error');
+    // Flash the auth overlay briefly
+    const overlay = document.getElementById('auth-overlay');
+    overlay.classList.remove('hidden');
+    setTimeout(() => { if (!gToken) {} else overlay.classList.add('hidden'); }, 100);
+    return false;
+  }
+  return true;
+}
+
+// Safe download — only works when authenticated
+function safeDownload(content, filename, actionLabel) {
+  if (!driveReady(actionLabel || 'downloading files')) return;
+  // Wait for latest Drive save to complete before downloading
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    driveSaveDB().then(() => {
+      _doDownload(content, filename);
+      toast(`✓ Drive synced & ${filename} downloaded`, 'success');
+    });
+  } else {
+    _doDownload(content, filename);
+  }
+}
+
+function _doDownload(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // MANUAL ORDER ENTRY
@@ -2092,6 +2199,7 @@ function clearManualForm() {
 }
 
 function addManualOrder() {
+  if (!driveReady('adding manual orders')) return;
   const type     = document.getElementById('m-type').value;
   const origId   = document.getElementById('m-orig-id').value.trim();
   const sku      = document.getElementById('m-sku').value.trim();
@@ -2264,6 +2372,7 @@ function showAccessDenied(email) {
 
 function showApp() {
   document.getElementById('auth-overlay').classList.add('hidden');
+  unlockUI();
   document.getElementById('sync-bar').style.display = 'flex';
   updateHeaderStats();
   renderUploadHistory();
@@ -2432,6 +2541,8 @@ renderUploadHistory();
 // Auth overlay shown by default — showApp() called after Drive load
 // Set today's date in manual form
 document.getElementById('m-date').value = today();
+// Lock UI until authenticated
+lockUI();
 </script>
 </body>
 </html>
