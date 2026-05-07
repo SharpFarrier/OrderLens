@@ -878,7 +878,7 @@ let DB = {
 const DRIVE_CONFIG = {
   CLIENT_ID: '801481705797-4lr6orueunsbdk5vhhe578bga4ai6lhq.apps.googleusercontent.com',
   FOLDER_ID: '1INU7t5iN9DJLIE4DeXDuV7A4IaqBMFDy',
-  SCOPES: 'https://www.googleapis.com/auth/drive.file',
+  SCOPES: 'https://www.googleapis.com/auth/drive',
   DB_FILE: 'orderlens_db.json',
   CONFIG_FILE: 'orderlens_config.json'
 };
@@ -2310,41 +2310,57 @@ function setAuthStatus(msg) {
 }
 
 async function onAuthSuccess() {
-  // Get user info
+  // ── Step 1: Verify token is valid via userinfo ──────────────────
+  setAuthStatus('Verifying account...');
   let userEmail = '';
   try {
     const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: 'Bearer ' + gToken }
     });
+    if (!r.ok) {
+      // Token invalid — don't show access denied, show a retry
+      gToken = null;
+      setAuthStatus('Authentication failed (code ' + r.status + '). Please try signing in again.');
+      return;
+    }
     const info = await r.json();
     userEmail = info.email || '';
     const el = document.getElementById('sync-user');
     if (el) el.textContent = userEmail;
-  } catch(e) {}
+  } catch(e) {
+    gToken = null;
+    setAuthStatus('Network error during sign-in. Check connection and try again.');
+    return;
+  }
 
-  // ── ACCESS CHECK ──────────────────────────────────────────────
-  // Try to access the folder — if 403/404, this account has no access
+  // ── Step 2: Check folder access ────────────────────────────────
   setAuthStatus('Checking access...');
   try {
     const checkRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${DRIVE_CONFIG.FOLDER_ID}?fields=id,name`,
       { headers: { Authorization: 'Bearer ' + gToken } }
     );
-    if (checkRes.status === 403 || checkRes.status === 404) {
-      // No access — show denial screen
+    if (checkRes.status === 403) {
+      showAccessDenied(userEmail);
+      return;
+    }
+    if (checkRes.status === 404) {
+      // 404 on a folder = no access (Drive returns 404 not 403 for inaccessible files)
       showAccessDenied(userEmail);
       return;
     }
     if (!checkRes.ok) {
-      setAuthStatus('Could not verify access. Try again.');
+      gToken = null;
+      setAuthStatus('Could not verify Drive access (code ' + checkRes.status + '). Try again.');
       return;
     }
   } catch(e) {
-    setAuthStatus('Network error. Check connection and try again.');
+    gToken = null;
+    setAuthStatus('Network error checking Drive access. Try again.');
     return;
   }
 
-  // Access confirmed — load app
+  // ── Step 3: Access confirmed — load app ─────────────────────────
   setSyncState('syncing', 'Loading from Drive...');
   await driveLoadAll();
   showApp();
