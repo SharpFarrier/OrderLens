@@ -2203,18 +2203,63 @@ function setAuthStatus(msg) {
 
 async function onAuthSuccess() {
   // Get user info
+  let userEmail = '';
   try {
     const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: 'Bearer ' + gToken }
     });
     const info = await r.json();
+    userEmail = info.email || '';
     const el = document.getElementById('sync-user');
-    if (el) el.textContent = info.email || '';
+    if (el) el.textContent = userEmail;
   } catch(e) {}
 
+  // ── ACCESS CHECK ──────────────────────────────────────────────
+  // Try to access the folder — if 403/404, this account has no access
+  setAuthStatus('Checking access...');
+  try {
+    const checkRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${DRIVE_CONFIG.FOLDER_ID}?fields=id,name`,
+      { headers: { Authorization: 'Bearer ' + gToken } }
+    );
+    if (checkRes.status === 403 || checkRes.status === 404) {
+      // No access — show denial screen
+      showAccessDenied(userEmail);
+      return;
+    }
+    if (!checkRes.ok) {
+      setAuthStatus('Could not verify access. Try again.');
+      return;
+    }
+  } catch(e) {
+    setAuthStatus('Network error. Check connection and try again.');
+    return;
+  }
+
+  // Access confirmed — load app
   setSyncState('syncing', 'Loading from Drive...');
   await driveLoadAll();
   showApp();
+}
+
+function showAccessDenied(email) {
+  // Revoke token — don't keep a token for an unauthorized user
+  if (gToken && window.google) google.accounts.oauth2.revoke(gToken);
+  gToken = null;
+
+  document.getElementById('auth-status').innerHTML = '';
+  const card = document.querySelector('.auth-card');
+  card.innerHTML = `
+    <div class="auth-logo">🔒</div>
+    <div class="auth-title">Access Denied</div>
+    <div class="auth-sub" style="color:var(--red);margin-bottom:16px;">
+      <strong>${email}</strong> does not have access to OrderLens.<br><br>
+      Ask your administrator to share the OrderLens folder with your Google account.
+    </div>
+    <button class="auth-btn" onclick="location.reload()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);">
+      ← Try a different account
+    </button>
+  `;
 }
 
 function showApp() {
