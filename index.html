@@ -1415,7 +1415,7 @@ function parseFlipkart(text) {
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = splitCSV(lines[i]);
     if (cols.length < 5) continue;
-    const get = (j) => j >= 0 ? cols[j].trim() : '';
+    const get = (j) => j >= 0 && cols[j] !== undefined ? String(cols[j]).trim() : '';
     if (!get(I.orderId)) continue;
     const addr = [get(I.addr1), get(I.addr2)].filter(Boolean).join(', ');
     orders.push({
@@ -1490,7 +1490,7 @@ function parseD2CCSV(text) {
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCSV(lines[i]);
     if (cols.length < 5) continue;
-    const get = (j) => j >= 0 ? cols[j].trim() : '';
+    const get = (j) => j >= 0 && cols[j] !== undefined ? String(cols[j]).trim() : '';
     if (!get(I.orderId)) continue;
 
     const payMode = get(I.payMode).toLowerCase();
