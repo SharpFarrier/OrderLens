@@ -1132,6 +1132,53 @@
     </div>
   </div>
 
+  <!-- Courier Dimension Coverage -->
+  <div class="guardrail-card" style="margin-bottom:20px;">
+    <div class="gc-title">📊 Courier Dimension Coverage</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
+      SKU-wise view of which dimensions are available for each courier export. <strong style="color:var(--green)">✓ mapped</strong> means the export file will have full dimension data. <strong style="color:var(--red)">✗ missing</strong> means those fields will be blank in the export.
+    </div>
+
+    <!-- Summary counts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;" id="dim-summary">
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+      <button class="tab active" data-dimtab="both" onclick="switchDimTab('both',this)" style="height:36px;padding:0 14px;font-size:12px;">All SKUs</button>
+      <button class="tab" data-dimtab="bd-only" onclick="switchDimTab('bd-only',this)" style="height:36px;padding:0 14px;font-size:12px;">🔵 Bluedart only</button>
+      <button class="tab" data-dimtab="sr-only" onclick="switchDimTab('sr-only',this)" style="height:36px;padding:0 14px;font-size:12px;">🔴 Shiprocket only</button>
+      <button class="tab" data-dimtab="missing" onclick="switchDimTab('missing',this)" style="height:36px;padding:0 14px;font-size:12px;">⚠ Missing in either</button>
+      <button class="tab" data-dimtab="none" onclick="switchDimTab('none',this)" style="height:36px;padding:0 14px;font-size:12px;">✗ Missing in both</button>
+    </div>
+
+    <!-- Search -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <div class="search-box" style="max-width:280px;">
+        <span style="color:var(--text3);">🔍</span>
+        <input type="text" placeholder="Search SKU..." oninput="filterDimTable(this.value)" id="dim-search">
+      </div>
+      <span style="font-size:12px;font-family:var(--font-mono);color:var(--text3);align-self:center;" id="dim-count"></span>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table id="dim-table">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>🔵 Bluedart L×W×H</th>
+            <th>🔵 Actual Wt</th>
+            <th>🔵 Vol. Wt</th>
+            <th>🔴 Shiprocket L×W×H</th>
+            <th>🔴 Weight (kg)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="dim-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Pincode overrides -->
   <div class="pincode-section">
     <div class="gc-title">📍 Pincode-Level Overrides</div>
@@ -2017,6 +2064,108 @@ function renderGuardrails() {
   document.getElementById('qty-threshold-display').textContent = DB.guardrails.qtyThreshold || 1;
   renderSkuList();
   renderPincodeList();
+  renderDimCoverage('both');
+}
+
+// ─────────────────────────────────────────────
+// DIMENSION COVERAGE TABLE
+// ─────────────────────────────────────────────
+let dimTabFilter = 'both';
+let dimSearchQ = '';
+
+function switchDimTab(tab, btn) {
+  dimTabFilter = tab;
+  document.querySelectorAll('[data-dimtab]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderDimCoverage(tab);
+}
+
+function filterDimTable(q) {
+  dimSearchQ = q.toLowerCase();
+  renderDimCoverage(dimTabFilter);
+}
+
+function renderDimCoverage(tab) {
+  // Build master SKU list from both dimension tables
+  const allSkus = new Set([...Object.keys(BD_DIMS), ...Object.keys(SR_DIMS)]);
+  const divisor = DB.guardrails.divisor || 5000;
+
+  // Summary counts
+  let bothCount = 0, bdOnly = 0, srOnly = 0, noneCount = 0;
+  allSkus.forEach(sku => {
+    const hasBD = !!BD_DIMS[sku];
+    const hasSR = !!SR_DIMS[sku];
+    if (hasBD && hasSR) bothCount++;
+    else if (hasBD && !hasSR) bdOnly++;
+    else if (!hasBD && hasSR) srOnly++;
+    else noneCount++;
+  });
+
+  document.getElementById('dim-summary').innerHTML = `
+    <div class="stat-card green" style="padding:12px 16px;">
+      <div class="stat-label">Both Couriers</div>
+      <div class="stat-val" style="font-size:20px;">${bothCount}</div>
+      <div class="stat-sub">fully mapped</div>
+    </div>
+    <div class="stat-card" style="padding:12px 16px;border-top:2px solid var(--yellow);">
+      <div class="stat-label">Missing in Either</div>
+      <div class="stat-val" style="font-size:20px;color:var(--yellow);">${bdOnly + srOnly}</div>
+      <div class="stat-sub">${bdOnly} BD only · ${srOnly} SR only</div>
+    </div>
+  `;
+
+  // Filter SKUs
+  let skus = [...allSkus].sort();
+  if (dimSearchQ) skus = skus.filter(s => s.toLowerCase().includes(dimSearchQ));
+
+  if (tab === 'bd-only')  skus = skus.filter(s => BD_DIMS[s] && !SR_DIMS[s]);
+  if (tab === 'sr-only')  skus = skus.filter(s => !BD_DIMS[s] && SR_DIMS[s]);
+  if (tab === 'missing')  skus = skus.filter(s => !BD_DIMS[s] || !SR_DIMS[s]);
+  if (tab === 'none')     skus = skus.filter(s => !BD_DIMS[s] && !SR_DIMS[s]);
+
+  document.getElementById('dim-count').textContent = skus.length + ' SKUs';
+
+  const tbody = document.getElementById('dim-tbody');
+  if (skus.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">✓</div><div class="empty-title">No SKUs in this filter</div></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = skus.map(sku => {
+    const bd = BD_DIMS[sku];
+    const sr = SR_DIMS[sku];
+    const hasBD = !!bd;
+    const hasSR = !!sr;
+
+    const volWt = bd ? ((bd.l * bd.w * bd.h) / divisor).toFixed(2) : '—';
+    const bdDims = bd ? `${bd.l}×${bd.w}×${bd.h}` : '—';
+    const bdWt = bd ? `${bd.actualWt} kg` : '—';
+    const srDims = sr ? `${sr.l}×${sr.w}×${sr.h}` : '—';
+    const srWt = sr ? `${sr.weightKg} kg` : '—';
+
+    let statusBadgeHtml;
+    if (hasBD && hasSR) {
+      statusBadgeHtml = `<span class="badge badge-tracked">✓ Both</span>`;
+    } else if (hasBD && !hasSR) {
+      statusBadgeHtml = `<span class="badge badge-pending">BD only</span>`;
+    } else if (!hasBD && hasSR) {
+      statusBadgeHtml = `<span class="badge badge-pending">SR only</span>`;
+    } else {
+      statusBadgeHtml = `<span class="badge badge-cancelled">✗ Neither</span>`;
+    }
+
+    const bdCell = (val, has) => `<td style="font-family:var(--font-mono);font-size:12px;color:${has ? 'var(--text2)' : 'var(--text3)'};">${val}</td>`;
+
+    return `<tr>
+      <td class="bold" style="font-family:var(--font-mono);font-size:12px;">${sku}</td>
+      ${bdCell(bdDims, hasBD)}
+      ${bdCell(bdWt, hasBD)}
+      ${bdCell(volWt, hasBD)}
+      ${bdCell(srDims, hasSR)}
+      ${bdCell(srWt, hasSR)}
+      <td>${statusBadgeHtml}</td>
+    </tr>`;
+  }).join('');
 }
 
 function saveGuardrails() {
@@ -2293,7 +2442,7 @@ function exportShiprocket() {
   const rows = orders.map(o => {
     const dim = lookupSRDim(o.sku) || {};
     const isCod = o.paymentType === 'cod';
-    const totalWt = dim.weightKg ? (dim.weightKg * (o.qty || 1)) : '';
+    const singleUnitWt = dim.weightKg || '';
 
     // ── Address splitting ─────────────────────────────────────
     const fullAddress = (o.address || '').trim();
@@ -2305,9 +2454,9 @@ function exportShiprocket() {
     const addrLine1 = fullAddress.slice(0, splitAt).trim();
     const addrLine2 = fullAddress.slice(splitAt).trim();
 
-    // ── Phone — strip to last 10 digits ──────────────────────
+    // ── Phone — strip to last 10 digits, fallback to warehouse number ──
     const rawPhone = String(o.phone || '').replace(/\D/g, '');
-    const phone10 = rawPhone.length > 10 ? rawPhone.slice(-10) : rawPhone;
+    const phone10 = rawPhone.length >= 10 ? rawPhone.slice(-10) : '8999198256';
 
     return {
       'order invoice number': o.orderId,
@@ -2344,12 +2493,12 @@ function exportShiprocket() {
       'order ready date': today(),
       'remarks': o.sku || '',
       'recipient GST': '',
-      'package total weight': totalWt,
+      'package total weight': singleUnitWt,
       'package1 no of units': o.qty || 1,
       'package1 length': dim.l || '',
       'package1 width': dim.w || '',
       'package1 height': dim.h || '',
-      'package1 weight(in kg)': dim.weightKg || '',
+      'package1 weight(in kg)': singleUnitWt,
       'package1 dimension': dim.l ? 'cm' : '',
       'package2 no of units': '', 'package2 length': '', 'package2 width': '', 'package2 height': '', 'package2 weight(in kg)': '', 'package2 dimension': '',
       'package3 no of units': '', 'package3 length': '', 'package3 width': '', 'package3 height': '', 'package3 weight(in kg)': '', 'package3 dimension': '',
