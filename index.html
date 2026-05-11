@@ -3124,21 +3124,81 @@ function addManualOrder() {
 
 // ── AUTH ─────────────────────────────────────────────────────────
 let tokenClient = null;
+let tokenExpiryTimer = null;
+let tokenExpireAt = null;
 
 function startAuth() {
   setAuthStatus('Connecting...');
   if (!window.google) { setAuthStatus('Google SDK not loaded. Check connection.'); return; }
+  initTokenClient();
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+function initTokenClient() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: DRIVE_CONFIG.CLIENT_ID,
     scope: DRIVE_CONFIG.SCOPES,
     callback: async (resp) => {
-      if (resp.error) { setAuthStatus('Sign-in failed: ' + resp.error); return; }
+      if (resp.error) {
+        // If silent refresh fails, show sign-in overlay
+        if (resp.error === 'interaction_required' || resp.error === 'login_required') {
+          gToken = null;
+          document.getElementById('auth-overlay').classList.remove('hidden');
+          document.getElementById('sync-bar').style.display = 'none';
+          setAuthStatus('Session expired — please sign in again.');
+        } else {
+          setAuthStatus('Sign-in failed: ' + resp.error);
+        }
+        return;
+      }
+      const isRefresh = !!gToken; // already had a token = this is a refresh
       gToken = resp.access_token;
-      setAuthStatus('Signed in — loading data...');
-      await onAuthSuccess();
+      // Schedule next refresh — tokens last 3600s, refresh at 3300s (55 min)
+      const expiresIn = (resp.expires_in || 3600) - 300; // 5 min before expiry
+      scheduleTokenRefresh(expiresIn);
+      tokenExpireAt = Date.now() + ((resp.expires_in || 3600) * 1000);
+      if (!isRefresh) {
+        setAuthStatus('Signed in — loading data...');
+        await onAuthSuccess();
+      } else {
+        setSyncState('ok', 'Token refreshed');
+      }
     }
   });
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+function scheduleTokenRefresh(inSeconds) {
+  if (tokenExpiryTimer) clearTimeout(tokenExpiryTimer);
+  tokenExpiryTimer = setTimeout(() => {
+    silentRefresh();
+  }, inSeconds * 1000);
+}
+
+function silentRefresh() {
+  if (!tokenClient) return;
+  // prompt: '' means silent — no popup, fails gracefully if interaction needed
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
+// Also refresh before any Drive operation if token is within 5 min of expiry
+async function ensureFreshToken() {
+  if (!gToken) return false;
+  if (tokenExpireAt && Date.now() > tokenExpireAt - 60000) {
+    // Within 1 minute of expiry — do a synchronous refresh before proceeding
+    return new Promise((resolve) => {
+      const originalCallback = tokenClient.callback;
+      tokenClient.callback = (resp) => {
+        if (!resp.error) {
+          gToken = resp.access_token;
+          tokenExpireAt = Date.now() + ((resp.expires_in || 3600) * 1000);
+        }
+        tokenClient.callback = originalCallback;
+        resolve(!resp.error);
+      };
+      tokenClient.requestAccessToken({ prompt: '' });
+    });
+  }
+  return true;
 }
 
 function setAuthStatus(msg) {
@@ -3235,6 +3295,9 @@ function showApp() {
 }
 
 function driveSignOut() {
+  if (tokenExpiryTimer) clearTimeout(tokenExpiryTimer);
+  tokenExpiryTimer = null;
+  tokenExpireAt = null;
   if (gToken) google.accounts.oauth2.revoke(gToken);
   gToken = null;
   document.getElementById('auth-overlay').classList.remove('hidden');
@@ -3252,6 +3315,9 @@ function setSyncState(state, label) {
 
 // ── DRIVE FILE HELPERS ──────────────────────────────────────────
 async function driveRequest(url, opts = {}) {
+  if (!gToken) return null;
+  // Ensure token is fresh before every Drive call
+  await ensureFreshToken();
   if (!gToken) return null;
   const res = await fetch(url, {
     ...opts,
