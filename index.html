@@ -1102,7 +1102,7 @@
   <div class="guardrail-card" style="margin-bottom:20px;">
     <div class="gc-title">📐 SKU Dimension Mapping</div>
     <div style="font-size:12px;color:var(--text2);font-family:var(--font-mono);margin-bottom:16px;line-height:1.6;">
-      Map each SKU to its box dimensions (L×W×H in cm). This is how OrderLens determines vol. weight and assigns courier. SKUs not mapped here default to Delhivery.
+      Optional override for vol. weight calculation only (courier assignment). For export dimensions use the Bluedart / Shiprocket tables below which are loaded from Drive.
     </div>
     <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end;">
       <div class="form-group">
@@ -1129,6 +1129,87 @@
     </div>
     <div id="sku-list" style="max-height:260px;overflow-y:auto;">
       <div style="text-align:center;padding:20px;color:var(--text3);font-family:var(--font-mono);font-size:12px;">No SKUs mapped yet</div>
+    </div>
+  </div>
+
+  <!-- Courier Dimension Management — Bluedart -->
+  <div class="guardrail-card" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="gc-title" style="margin-bottom:0;">🔵 Bluedart Dimensions</div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;position:relative;">
+        ⬆ Bulk Import (Logistics_Dimensions.xlsx)
+        <input type="file" accept=".xlsx,.xls,.csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="bulkImportDims(event,'bd')">
+      </label>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
+      Fields used in Bluedart export: SKU ID, L, B (width), H, Actual Weight, Chargeable Weight (auto = max of actual vs vol.wt).
+    </div>
+    <!-- BD Add/Edit Form -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;background:var(--surface2);border-radius:var(--radius);margin-bottom:14px;">
+      <div class="form-group"><div class="form-label">SKU</div><input class="form-input" id="bd-sku" placeholder="e.g. HTMD-3x6BL" style="width:170px;"></div>
+      <div class="form-group"><div class="form-label">L (cm)</div><input class="form-input" id="bd-l" type="number" placeholder="94" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">B/W (cm)</div><input class="form-input" id="bd-w" type="number" placeholder="80" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">H (cm)</div><input class="form-input" id="bd-h" type="number" placeholder="14" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">Actual Wt (kg)</div><input class="form-input" id="bd-wt" type="number" placeholder="14.52" step="0.01" style="width:90px;"></div>
+      <div style="display:flex;gap:6px;align-self:flex-end;">
+        <button class="btn btn-primary btn-sm" onclick="saveBDDim()">💾 Save</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearBDForm()">✕ Clear</button>
+      </div>
+    </div>
+    <!-- BD Search + Table -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+      <div class="search-box" style="max-width:260px;">
+        <span style="color:var(--text3);">🔍</span>
+        <input type="text" placeholder="Search SKU..." oninput="filterBDTable(this.value)" id="bd-search">
+      </div>
+      <span style="font-size:12px;font-family:var(--font-mono);color:var(--text3);" id="bd-count"></span>
+    </div>
+    <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+      <table id="bd-table">
+        <thead><tr><th>SKU</th><th>L</th><th>B</th><th>H</th><th>Actual Wt</th><th>Vol. Wt</th><th>Chargeable</th><th>Source</th><th></th></tr></thead>
+        <tbody id="bd-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Courier Dimension Management — Shiprocket -->
+  <div class="guardrail-card" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="gc-title" style="margin-bottom:0;">🔴 Shiprocket Dimensions</div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;position:relative;">
+        ⬆ Bulk Import (Logistics_Dimensions.xlsx)
+        <input type="file" accept=".xlsx,.xls,.csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="bulkImportDims(event,'sr')">
+      </label>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
+      Fields used in Shiprocket export: SKU (remarks), L, W, H, Weight in kg (package weight).
+    </div>
+    <!-- SR Add/Edit Form -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;background:var(--surface2);border-radius:var(--radius);margin-bottom:14px;">
+      <div class="form-group"><div class="form-label">SKU</div><input class="form-input" id="sr-sku" placeholder="e.g. HTMD-3x6BL" style="width:170px;"></div>
+      <div class="form-group"><div class="form-label">L (cm)</div><input class="form-input" id="sr-l" type="number" placeholder="93.9" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">W (cm)</div><input class="form-input" id="sr-w" type="number" placeholder="13.3" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">H (cm)</div><input class="form-input" id="sr-h" type="number" placeholder="99.8" style="width:75px;"></div>
+      <div class="form-group"><div class="form-label">Weight (grams)</div><input class="form-input" id="sr-gms" type="number" placeholder="17300" style="width:100px;" oninput="autoCalcSRKg()"></div>
+      <div class="form-group"><div class="form-label">Weight (kg)</div><input class="form-input" id="sr-kg" type="number" placeholder="17.3" step="0.001" style="width:85px;"></div>
+      <div style="display:flex;gap:6px;align-self:flex-end;">
+        <button class="btn btn-primary btn-sm" onclick="saveSRDim()">💾 Save</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearSRForm()">✕ Clear</button>
+      </div>
+    </div>
+    <!-- SR Search + Table -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+      <div class="search-box" style="max-width:260px;">
+        <span style="color:var(--text3);">🔍</span>
+        <input type="text" placeholder="Search SKU..." oninput="filterSRTable(this.value)" id="sr-search">
+      </div>
+      <span style="font-size:12px;font-family:var(--font-mono);color:var(--text3);" id="sr-count"></span>
+    </div>
+    <div style="overflow-x:auto;max-height:320px;overflow-y:auto;">
+      <table id="sr-table">
+        <thead><tr><th>SKU</th><th>L</th><th>W</th><th>H</th><th>Weight (gms)</th><th>Weight (kg)</th><th>Source</th><th></th></tr></thead>
+        <tbody id="sr-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -1261,7 +1342,9 @@ const DRIVE_CONFIG = {
   FOLDER_ID: '1INU7t5iN9DJLIE4DeXDuV7A4IaqBMFDy',
   SCOPES: 'https://www.googleapis.com/auth/drive openid email',
   DB_FILE: 'orderlens_db.json',
-  CONFIG_FILE: 'orderlens_config.json'
+  CONFIG_FILE: 'orderlens_config.json',
+  BD_DIMS_FILE: 'orderlens_bd_dims.json',
+  SR_DIMS_FILE: 'orderlens_sr_dims.json'
 };
 
 let gToken = null;
@@ -2064,7 +2147,254 @@ function renderGuardrails() {
   document.getElementById('qty-threshold-display').textContent = DB.guardrails.qtyThreshold || 1;
   renderSkuList();
   renderPincodeList();
+  renderBDTable();
+  renderSRTable();
   renderDimCoverage('both');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// DIMENSION CRUD — Bluedart & Shiprocket
+// ═══════════════════════════════════════════════════════════════════
+
+let bdSearchQ = '', srSearchQ = '';
+
+// ── BD FORM ──────────────────────────────────────────────────────
+function clearBDForm() {
+  ['bd-sku','bd-l','bd-w','bd-h','bd-wt'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('bd-sku').dataset.editMode = '';
+}
+
+function editBDRow(sku) {
+  const d = BD_DIMS[sku];
+  if (!d) return;
+  document.getElementById('bd-sku').value = sku;
+  document.getElementById('bd-sku').dataset.editMode = 'true';
+  document.getElementById('bd-l').value = d.l || '';
+  document.getElementById('bd-w').value = d.w || '';
+  document.getElementById('bd-h').value = d.h || '';
+  document.getElementById('bd-wt').value = d.actualWt || '';
+  document.getElementById('bd-sku').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function saveBDDim() {
+  if (!driveReady('saving Bluedart dimensions')) return;
+  const sku = document.getElementById('bd-sku').value.trim();
+  const l   = parseFloat(document.getElementById('bd-l').value);
+  const w   = parseFloat(document.getElementById('bd-w').value);
+  const h   = parseFloat(document.getElementById('bd-h').value);
+  const wt  = parseFloat(document.getElementById('bd-wt').value);
+  if (!sku) { toast('SKU is required', 'error'); return; }
+  if (!l || !w || !h) { toast('L, B, H are required', 'error'); return; }
+  if (!wt) { toast('Actual weight is required', 'error'); return; }
+  BD_DIMS[sku] = { actualWt: wt, l, w, h };
+  driveSaveBDDims();
+  clearBDForm();
+  renderBDTable();
+  renderDimCoverage(dimTabFilter);
+  toast(`✓ ${sku} saved to Bluedart dims`, 'success');
+}
+
+function deleteBDDim(sku) {
+  if (!driveReady('deleting Bluedart dimension')) return;
+  if (!confirm(`Delete "${sku}" from Bluedart dimensions?`)) return;
+  delete BD_DIMS[sku];
+  driveSaveBDDims();
+  renderBDTable();
+  renderDimCoverage(dimTabFilter);
+  toast(`Deleted ${sku} from Bluedart dims`, 'info');
+}
+
+function filterBDTable(q) { bdSearchQ = q.toLowerCase(); renderBDTable(); }
+
+function renderBDTable() {
+  const divisor = DB.guardrails.divisor || 5000;
+  const threshold = DB.guardrails.threshold || 10;
+  let skus = Object.keys(BD_DIMS).sort();
+  if (bdSearchQ) skus = skus.filter(s => s.toLowerCase().includes(bdSearchQ));
+  document.getElementById('bd-count').textContent = skus.length + ' SKUs';
+
+  const tbody = document.getElementById('bd-tbody');
+  if (!tbody) return;
+  if (skus.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No SKUs</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = skus.map(sku => {
+    const d = BD_DIMS[sku];
+    const vw = (d.l * d.w * d.h) / divisor;
+    const charg = Math.max(d.actualWt || 0, vw);
+    const courier = vw <= threshold ? '🔵 BD' : '🔴 DL';
+    const isOverride = !BD_SEED[sku];  // not in seed = user-added
+    return `<tr>
+      <td class="bold" style="font-family:var(--font-mono);font-size:12px;">${sku}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.l}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.w}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.h}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.actualWt}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${vw.toFixed(2)}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${charg.toFixed(2)} ${courier}</td>
+      <td><span class="badge ${isOverride ? 'badge-manual' : 'badge-assigned'}">${isOverride ? 'custom' : 'seed'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-sm btn-secondary" onclick="editBDRow('${sku.replace(/'/g,"\'")}')">✏</button>
+          <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fecaca;" onclick="deleteBDDim('${sku.replace(/'/g,"\'")}')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── SR FORM ──────────────────────────────────────────────────────
+function clearSRForm() {
+  ['sr-sku','sr-l','sr-w','sr-h','sr-gms','sr-kg'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('sr-sku').dataset.editMode = '';
+}
+
+function autoCalcSRKg() {
+  const gms = parseFloat(document.getElementById('sr-gms').value);
+  if (gms) document.getElementById('sr-kg').value = (gms / 1000).toFixed(3);
+}
+
+function editSRRow(sku) {
+  const d = SR_DIMS[sku];
+  if (!d) return;
+  document.getElementById('sr-sku').value = sku;
+  document.getElementById('sr-sku').dataset.editMode = 'true';
+  document.getElementById('sr-l').value = d.l || '';
+  document.getElementById('sr-w').value = d.w || '';
+  document.getElementById('sr-h').value = d.h || '';
+  document.getElementById('sr-gms').value = d.weightGms || '';
+  document.getElementById('sr-kg').value = d.weightKg || '';
+  document.getElementById('sr-sku').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function saveSRDim() {
+  if (!driveReady('saving Shiprocket dimensions')) return;
+  const sku = document.getElementById('sr-sku').value.trim();
+  const l   = parseFloat(document.getElementById('sr-l').value);
+  const w   = parseFloat(document.getElementById('sr-w').value);
+  const h   = parseFloat(document.getElementById('sr-h').value);
+  const gms = parseFloat(document.getElementById('sr-gms').value);
+  const kg  = parseFloat(document.getElementById('sr-kg').value);
+  if (!sku) { toast('SKU is required', 'error'); return; }
+  if (!l || !w || !h) { toast('L, W, H are required', 'error'); return; }
+  if (!kg) { toast('Weight (kg) is required', 'error'); return; }
+  SR_DIMS[sku] = { weightGms: gms || kg * 1000, weightKg: kg, l, w, h };
+  driveSaveSRDims();
+  clearSRForm();
+  renderSRTable();
+  renderDimCoverage(dimTabFilter);
+  toast(`✓ ${sku} saved to Shiprocket dims`, 'success');
+}
+
+function deleteSRDim(sku) {
+  if (!driveReady('deleting Shiprocket dimension')) return;
+  if (!confirm(`Delete "${sku}" from Shiprocket dimensions?`)) return;
+  delete SR_DIMS[sku];
+  driveSaveSRDims();
+  renderSRTable();
+  renderDimCoverage(dimTabFilter);
+  toast(`Deleted ${sku} from Shiprocket dims`, 'info');
+}
+
+function filterSRTable(q) { srSearchQ = q.toLowerCase(); renderSRTable(); }
+
+function renderSRTable() {
+  let skus = Object.keys(SR_DIMS).sort();
+  if (srSearchQ) skus = skus.filter(s => s.toLowerCase().includes(srSearchQ));
+  document.getElementById('sr-count').textContent = skus.length + ' SKUs';
+
+  const tbody = document.getElementById('sr-tbody');
+  if (!tbody) return;
+  if (skus.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No SKUs</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = skus.map(sku => {
+    const d = SR_DIMS[sku];
+    const isOverride = !SR_SEED[sku];
+    return `<tr>
+      <td class="bold" style="font-family:var(--font-mono);font-size:12px;">${sku}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.l}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.w}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.h}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.weightGms || '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${d.weightKg}</td>
+      <td><span class="badge ${isOverride ? 'badge-manual' : 'badge-assigned'}">${isOverride ? 'custom' : 'seed'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-sm btn-secondary" onclick="editSRRow('${sku.replace(/'/g,"\'")}')">✏</button>
+          <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fecaca;" onclick="deleteSRDim('${sku.replace(/'/g,"\'")}')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── BULK IMPORT ──────────────────────────────────────────────────
+function bulkImportDims(event, courier) {
+  if (!driveReady('bulk importing dimensions')) return;
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  ensureXLSX((err) => {
+    if (err) { toast('Could not load XLSX library', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+
+        if (courier === 'bd') {
+          // Read BlueDart sheet
+          const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('blue') || s.toLowerCase().includes('bd')) || wb.SheetNames[0];
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+          let added = 0, updated = 0;
+          rows.forEach(row => {
+            const sku = String(row['Sku ID'] || row['SKU ID'] || row['SKU'] || '').trim();
+            const l = parseFloat(row['L']);
+            const w = parseFloat(row['B'] || row['W'] || row['Width']);
+            const h = parseFloat(row['H']);
+            const wt = parseFloat(row['Actual Weight'] || row['ActualWeight']);
+            if (!sku || !l || !w || !h || !wt) return;
+            const isNew = !BD_DIMS[sku];
+            BD_DIMS[sku] = { actualWt: wt, l, w, h };
+            isNew ? added++ : updated++;
+          });
+          driveSaveBDDims();
+          renderBDTable();
+          renderDimCoverage(dimTabFilter);
+          toast(`✓ Bluedart: ${added} added, ${updated} updated`, 'success');
+
+        } else {
+          // Read Shiprocket sheet
+          const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('ship') || s.toLowerCase().includes('sr')) || wb.SheetNames[1] || wb.SheetNames[0];
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+          let added = 0, updated = 0;
+          rows.forEach(row => {
+            const sku = String(row['Skus'] || row['SKU'] || row['Sku'] || '').trim();
+            const l = parseFloat(row['LENGTH (cm)'] || row['L']);
+            const w = parseFloat(row['BREADTH (cm)'] || row['W'] || row['Width']);
+            const h = parseFloat(row['HEIGHT (cm)'] || row['H']);
+            const gms = parseFloat(row['WEIGHT (gms)'] || row['Weight (gms)'] || 0);
+            const kg = parseFloat(row['Weight in KGs'] || row['Weight (kg)'] || row['Kg'] || 0) || gms / 1000;
+            if (!sku || !l || !w || !h || !kg) return;
+            const isNew = !SR_DIMS[sku];
+            SR_DIMS[sku] = { weightGms: gms || kg * 1000, weightKg: kg, l, w, h };
+            isNew ? added++ : updated++;
+          });
+          driveSaveSRDims();
+          renderSRTable();
+          renderDimCoverage(dimTabFilter);
+          toast(`✓ Shiprocket: ${added} added, ${updated} updated`, 'success');
+        }
+      } catch(err) {
+        toast('Import error: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -2329,9 +2659,19 @@ function lookupSku(sku) {
 // BD_DIMS: Bluedart sheet (actual weight + L×W×H)
 // SR_DIMS: Shiprocket sheet (weight in grams, kg, L×W×H)
 // ─────────────────────────────────────────────
-const BD_DIMS = {"FF-AR23-BDIW":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HT-GD-SQ-BL-B-256":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HT-GD-SQ-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-GD-VV-BL-B-256":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HT-GD-VV-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-MB-BL2-256":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HT-MB-BL2-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-MB-W2-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-SC-BL-B":{"actualWt":9.0,"l":101.0,"w":57.5,"h":17.5},"HTF-BL-2.5":{"actualWt":14.52,"l":100.5,"w":80.0,"h":14.0},"HTF-BL-3":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTF-W-2.5":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTF-W-3":{"actualWt":15.32,"l":98.0,"w":97.5,"h":14.5},"HTFC-T":{"actualWt":9.0,"l":58.0,"w":22.0,"h":101.0},"HTMD-2.5x6BL":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTMD-2.5x6W":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTMD-3x6BL":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMD-3x6W":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMM-2.5x6BL":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HTMM-3x6BL":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HTMR-3x6(BLACK)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BR-B-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-BR-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BR-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-B-36-2IN":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-B-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-B-256-1IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-256-1IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(BLACK)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-B-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-W-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-MR-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-MR-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HTMR2-3x6(B)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-3x6(WHITE)":{"actualWt":18.5,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(WHITE)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HTMR2-3x6(W)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR2-2.5x6(B)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-DB-EL-4x6":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-R-B-BR-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-BR-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-B-BR-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-BR-256-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-MBW2-256":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMR2-2.5x6(W)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-DBM-EL-4x6":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"MMIVF-3x6":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"MMIVF-2.5x6":{"actualWt":15.32,"l":94.0,"w":84.0,"h":14.0},"HT-DB-EL-B-4x6":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"MBR-3X6":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"MMBF-3X6":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"MBR-2.5X6":{"actualWt":16.26,"l":94.0,"w":82.0,"h":16.0},"HT-QB-EL-5x6":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-QBM-EL-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-R-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-B-B-HB-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-B-B-HB-2IN-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"ZJ-8WU3-KVXZ":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-S-W-B-HB-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-W-B-HB-2IN-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-MB-W-HB-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-R-W-BR-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-W-BR-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-W-BR-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-W-BR-256-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-MB-B-HB-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-R-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-BR-2.5x6-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"MMF-2.5x6":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"BOX":{"actualWt":5.0,"l":94.0,"w":94.0,"h":14.0},"HT-DBM-HB-4x6":{"actualWt":20.35,"l":104.0,"w":125.0,"h":16.0},"HT-R-B-B-HB(EL)-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-DB-HB-4x6":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-MB-B-HB(EL)-36":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-KB-B-B-HB(EL)-6x6.25":{"actualWt":59.0,"l":186.0,"w":104.0,"h":25.0},"HT-KBM-B-B-HB(EL)-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"HT-KB-EL-6x6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"HT-KBM-EL-6x6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-GD-SQ-BR-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-QBM-HB-5x6.25":{"actualWt":22.77,"l":104.0,"w":155.0,"h":16.0},"HT-QBM-G-B-CS-5x6":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"HT-QB-G-B-CS-5x6":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"HT-KBM-HB-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"HT-S-B-B-HB-2IN(3L)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-MB-B-HB(2)-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-S-B-B-HB-2IN(2)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-S-B-W-HB-2IN(3L)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-HB(EL)-2IN(3L)-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-DBM-G-B-CS-4x6":{"actualWt":40.87,"l":105.0,"w":125.0,"h":32.0},"HT-QBM-EL-M- 5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-DB-G-B-CS-4x6":{"actualWt":38.5,"l":99.0,"w":121.0,"h":23.0},"HT-R-W-B-HB(EL)-2IN(3L)-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-B-2IN-36(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-KB-HB-6x6.25":{"actualWt":59.0,"l":183.0,"w":102.0,"h":25.0},"HT-QB-B-M3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-SB-B-TR-3x6":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"SW-GB-4x6":{"actualWt":38.5,"l":99.0,"w":121.0,"h":23.0},"HT-QB-B-M1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-R-W-B-HB(EL)-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-QB-B-FW1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-B-M2-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-BL-TR-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"SW-TR-BL-BL-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"HT-R-W-B-HB(EL)-2IN-36":{"actualWt":29.43,"l":100.0,"w":95.0,"h":24.0},"SW-G-BL-CS-M-5":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"HT-S-MB-B-HB-36":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-QB-B-FW3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-S-W-HB-3L-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"SW-G-B-CS-3L-5x6.25":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"SW-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-2L-4x6.25":{"actualWt":46.52,"l":105.0,"w":125.0,"h":32.0},"SW-G-B-CS-M-4x6.25":{"actualWt":32.0,"l":105.0,"w":125.0,"h":21.0},"SW-G-B-CS-M-5x6.25":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"SW-G-B-CS-2L-5x6.25":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"SW-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-B-FW2-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-2L-DB-IV-EL-4x6.25":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-2L-QB-IV-EL-5x6.25":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-M-QBM-IV-EL-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-2L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-NS-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-B-BL-HW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-DBM-IV-EL-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"M-BL-BL-NS-4":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"2L-IV-BL-EL-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-B-BL-NS-4":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"SW-3L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-IV-BL-EL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-R-BR-B-3x6-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-M-DBM-B-NS-4x6.25":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"SF-KBM-HB-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"SW-G-B-CS-3L-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-SPC-5LY-B-AO":{"actualWt":11.3,"l":96.0,"w":12.7,"h":67.0},"HT-R-SPC-5LY-B-FW":{"actualWt":11.3,"l":96.0,"w":12.7,"h":67.0},"SW-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-KBM-G-B-CS-6x6":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"SW-2L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-3L-4x6.25":{"actualWt":46.52,"l":105.0,"w":125.0,"h":32.0},"HT-M-DBM-IV-EL-4x6.25":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"3L-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-EL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-KB-G-B-CS-6x6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"3L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-KBM-IV-EL-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"2L-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-SPC-5LY-B-FW":{"actualWt":11.0,"l":96.0,"w":127.0,"h":67.0},"2L-IV-BL-EL-6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"SW-2L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-R-SPC-5LY-B-AO":{"actualWt":11.3,"l":96.0,"w":127.0,"h":67.0},"SW-3L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-2L-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-2L-KB-IV-EL-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"3L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-EL-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-TR-BL-BR-3":{"actualWt":17.0,"l":102.0,"w":105.0,"h":25.0},"SW-G-B-CS-M-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":17.0},"M-IV-BL-EL-6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":17.0},"HT-M-QB-B-LG-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-3L-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-D-B-WH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-D-W-GR-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-QB-B-OS-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-WH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-QB-B-NS-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-GR-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"SW-2L-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-QBM-B-NS-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-GR-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"SW-3L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-3L-B-FW1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-D-W-WH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-R-BR-b-2.5x6-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-D-W-WH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-BS-BL-BL-5":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-2L-QB-B-OS-5x6":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-D-W-GR-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-BS-BL-BL-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-3L-SB-B-GR-RE-3x6":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-256-2IN(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-36-2IN(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-D-B-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-BS-BL-BL-4":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-D-W-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-3L-DB-B-BL-NV-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-3L-QB-B-BL-NV-5":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-M-BS-BL-BL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-D-B-AO-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-D-W-AO-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-DB-B-OS-4x6":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-D-W-NH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-3L-KB-B-BL-NV-6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"HTMR-3x6(BLACK)-2L":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"SWB-D-WH-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"3L-B-BR-TR-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"HT-QB-2L-B-M3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HTMR-3x6(BLACK)-3L":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(WHITE)-3L":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0}};
+// ─────────────────────────────────────────────
+// DIMENSION TABLES — Drive-backed, seeded from hardcoded data
+// BD_DIMS: Bluedart (actualWt, l, w, h)
+// SR_DIMS: Shiprocket (weightGms, weightKg, l, w, h)
+// ─────────────────────────────────────────────
+const BD_SEED = {"FF-AR23-BDIW":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HT-GD-SQ-BL-B-256":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HT-GD-SQ-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-GD-VV-BL-B-256":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HT-GD-VV-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-MB-BL2-256":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HT-MB-BL2-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-MB-W2-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-SC-BL-B":{"actualWt":9.0,"l":101.0,"w":57.5,"h":17.5},"HTF-BL-2.5":{"actualWt":14.52,"l":100.5,"w":80.0,"h":14.0},"HTF-BL-3":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTF-W-2.5":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTF-W-3":{"actualWt":15.32,"l":98.0,"w":97.5,"h":14.5},"HTFC-T":{"actualWt":9.0,"l":58.0,"w":22.0,"h":101.0},"HTMD-2.5x6BL":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTMD-2.5x6W":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"HTMD-3x6BL":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMD-3x6W":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMM-2.5x6BL":{"actualWt":16.26,"l":94.0,"w":82.0,"h":19.0},"HTMM-3x6BL":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HTMR-3x6(BLACK)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BR-B-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-BR-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BR-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-B-36-2IN":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-B-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-B-256-1IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-256-1IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(BLACK)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-BL-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-B-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-B-W-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-W-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-BL-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-R-MR-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-MR-W-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HTMR2-3x6(B)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-3x6(WHITE)":{"actualWt":18.5,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(WHITE)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HTMR2-3x6(W)":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR2-2.5x6(B)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-DB-EL-4x6":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-R-B-BR-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-BR-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-B-BR-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-BR-256-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-MBW2-256":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HTMR2-2.5x6(W)":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-DBM-EL-4x6":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"MMIVF-3x6":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"MMIVF-2.5x6":{"actualWt":15.32,"l":94.0,"w":84.0,"h":14.0},"HT-DB-EL-B-4x6":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"MBR-3X6":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"MMBF-3X6":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"MBR-2.5X6":{"actualWt":16.26,"l":94.0,"w":82.0,"h":16.0},"HT-QB-EL-5x6":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-QBM-EL-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-R-B-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-B-B-HB-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-B-B-HB-2IN-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"ZJ-8WU3-KVXZ":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-S-W-B-HB-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-S-W-B-HB-2IN-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-MB-W-HB-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-R-W-BR-36-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-W-BR-36-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-R-W-BR-256-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-W-BR-256-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-MB-B-HB-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-R-W-256":{"actualWt":19.2,"l":94.0,"w":84.0,"h":18.0},"HT-R-B-BR-2.5x6-1IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"MMF-2.5x6":{"actualWt":14.52,"l":94.0,"w":80.0,"h":14.0},"BOX":{"actualWt":5.0,"l":94.0,"w":94.0,"h":14.0},"HT-DBM-HB-4x6":{"actualWt":20.35,"l":104.0,"w":125.0,"h":16.0},"HT-R-B-B-HB(EL)-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-DB-HB-4x6":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-MB-B-HB(EL)-36":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-KB-B-B-HB(EL)-6x6.25":{"actualWt":59.0,"l":186.0,"w":104.0,"h":25.0},"HT-KBM-B-B-HB(EL)-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"HT-KB-EL-6x6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"HT-KBM-EL-6x6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-GD-SQ-BR-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-QBM-HB-5x6.25":{"actualWt":22.77,"l":104.0,"w":155.0,"h":16.0},"HT-QBM-G-B-CS-5x6":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"HT-QB-G-B-CS-5x6":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"HT-KBM-HB-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"HT-S-B-B-HB-2IN(3L)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-MB-B-HB(2)-36":{"actualWt":15.32,"l":94.0,"w":94.0,"h":14.0},"HT-S-B-B-HB-2IN(2)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-S-B-W-HB-2IN(3L)-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-HB(EL)-2IN(3L)-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-DBM-G-B-CS-4x6":{"actualWt":40.87,"l":105.0,"w":125.0,"h":32.0},"HT-QBM-EL-M- 5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-DB-G-B-CS-4x6":{"actualWt":38.5,"l":99.0,"w":121.0,"h":23.0},"HT-R-W-B-HB(EL)-2IN(3L)-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-R-B-B-2IN-36(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-KB-HB-6x6.25":{"actualWt":59.0,"l":183.0,"w":102.0,"h":25.0},"HT-QB-B-M3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-SB-B-TR-3x6":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"SW-GB-4x6":{"actualWt":38.5,"l":99.0,"w":121.0,"h":23.0},"HT-QB-B-M1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-R-W-B-HB(EL)-1IN-36":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HT-QB-B-FW1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-B-M2-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-BL-TR-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"SW-TR-BL-BL-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"HT-R-W-B-HB(EL)-2IN-36":{"actualWt":29.43,"l":100.0,"w":95.0,"h":24.0},"SW-G-BL-CS-M-5":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"HT-S-MB-B-HB-36":{"actualWt":14.0,"l":94.0,"w":94.0,"h":13.0},"HT-QB-B-FW3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-S-W-HB-3L-36":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"SW-G-B-CS-3L-5x6.25":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"SW-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-2L-4x6.25":{"actualWt":46.52,"l":105.0,"w":125.0,"h":32.0},"SW-G-B-CS-M-4x6.25":{"actualWt":32.0,"l":105.0,"w":125.0,"h":21.0},"SW-G-B-CS-M-5x6.25":{"actualWt":30.58,"l":104.0,"w":154.0,"h":20.0},"SW-G-B-CS-2L-5x6.25":{"actualWt":52.61,"l":104.0,"w":154.0,"h":32.0},"SW-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-B-FW2-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-2L-DB-IV-EL-4x6.25":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-2L-QB-IV-EL-5x6.25":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-M-QBM-IV-EL-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-2L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-NS-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-B-BL-HW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-DBM-IV-EL-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"M-BL-BL-NS-4":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"2L-IV-BL-EL-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-B-BL-NS-4":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"SW-3L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-IV-BL-EL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-R-BR-B-3x6-2IN":{"actualWt":19.54,"l":94.0,"w":94.0,"h":19.0},"HT-M-DBM-B-NS-4x6.25":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"SF-KBM-HB-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"SW-G-B-CS-3L-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-SPC-5LY-B-AO":{"actualWt":11.3,"l":96.0,"w":12.7,"h":67.0},"HT-R-SPC-5LY-B-FW":{"actualWt":11.3,"l":96.0,"w":12.7,"h":67.0},"SW-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-KBM-G-B-CS-6x6":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"SW-2L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-3L-4x6.25":{"actualWt":46.52,"l":105.0,"w":125.0,"h":32.0},"HT-M-DBM-IV-EL-4x6.25":{"actualWt":18.56,"l":103.0,"w":125.0,"h":17.0},"3L-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"2L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-EL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-KB-G-B-CS-6x6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"3L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-KBM-IV-EL-6x6.25":{"actualWt":41.0,"l":186.0,"w":104.0,"h":15.0},"2L-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-SPC-5LY-B-FW":{"actualWt":11.0,"l":96.0,"w":127.0,"h":67.0},"2L-IV-BL-EL-6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"SW-2L-B-BL-FW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-R-SPC-5LY-B-AO":{"actualWt":11.3,"l":96.0,"w":127.0,"h":67.0},"SW-3L-B-BL-HW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-G-B-CS-2L-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"HT-2L-KB-IV-EL-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":19.0},"3L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"M-IV-BL-EL-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-TR-BL-BR-3":{"actualWt":17.0,"l":102.0,"w":105.0,"h":25.0},"SW-G-B-CS-M-6x6.25":{"actualWt":31.88,"l":104.0,"w":186.0,"h":17.0},"M-IV-BL-EL-6":{"actualWt":31.88,"l":104.0,"w":186.0,"h":17.0},"HT-M-QB-B-LG-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"SW-3L-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-D-B-WH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-D-W-GR-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-QB-B-OS-5x6":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-WH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-QB-B-NS-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-GR-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"SW-2L-B-BL-FW2-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"SW-B-BL-HW3-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-M-QBM-B-NS-5x6.25":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-D-B-GR-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"SW-3L-B-BL-FW1-5":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-QB-3L-B-FW1-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HT-D-W-WH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-R-BR-b-2.5x6-2IN":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0},"HT-D-W-WH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-BS-BL-BL-5":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-2L-QB-B-OS-5x6":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-D-W-GR-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-M-BS-BL-BL-5":{"actualWt":24.67,"l":104.0,"w":154.0,"h":17.0},"HT-3L-SB-B-GR-RE-3x6":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-256-2IN(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-R-B-B-36-2IN(3L)":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"HT-D-B-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-BS-BL-BL-4":{"actualWt":31.21,"l":104.0,"w":125.0,"h":26.0},"HT-D-W-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-3L-DB-B-BL-NV-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-3L-QB-B-BL-NV-5":{"actualWt":39.76,"l":104.0,"w":154.0,"h":26.0},"HT-M-BS-BL-BL-4":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-D-B-AO-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-D-W-AO-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-2L-DB-B-OS-4x6":{"actualWt":34.3,"l":104.0,"w":127.0,"h":26.0},"HT-D-W-NH-LZ-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"HT-3L-KB-B-BL-NV-6":{"actualWt":59.0,"l":183.0,"w":104.0,"h":25.0},"HTMR-3x6(BLACK)-2L":{"actualWt":19.54,"l":99.0,"w":94.0,"h":19.0},"SWB-D-WH-NH-DU-4":{"actualWt":21.6,"l":83.0,"w":123.0,"h":10.0},"3L-B-BR-TR-3":{"actualWt":15.32,"l":102.0,"w":105.0,"h":25.0},"HT-QB-2L-B-M3-WM-5x6":{"actualWt":39.11,"l":155.0,"w":112.0,"h":16.0},"HTMR-3x6(BLACK)-3L":{"actualWt":19.54,"l":94.0,"w":94.0,"h":18.0},"HTMR-2.5x6(WHITE)-3L":{"actualWt":19.2,"l":94.0,"w":84.0,"h":19.0}};
 
-const SR_DIMS = {"HT-KBM-G-B-CS-6 6.25":{"weightGms":50450.0,"weightKg":50.45,"l":184.1,"w":29.2,"h":105.4},"SW-TR-BL-BL-3":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"2L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-IV-BL-EL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"2L-IV-BL-EL-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"2L-IV-BL-EL-6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"3L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BR-TR-3":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HTF-BL-2.5":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HTF-BL-3":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HTFC-T":{"weightGms":10020.0,"weightKg":10.02,"l":56.1,"w":19.1,"h":100.7},"HTF-W-2.5":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HTF-W-3":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-KB-EL-6 6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"HT-KB-HB-6 6.25":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"HT-KBM-EL-6 6":{"weightGms":38450.0,"weightKg":38.45,"l":183.6,"w":16.1,"h":103.0},"HT-KBM-HB-6 6.25":{"weightGms":38450.0,"weightKg":38.45,"l":183.6,"w":16.1,"h":103.0},"HT-MB-B-HB(2)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-B-HB(EL)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-B-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-BL2-256":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HT-M-BS-BL-BL-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-MB-W2-256":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HT-MB-W2-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-W-HB(EL)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-W-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-M-QB-B-LG-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-M-QB-B-OS-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-M-QBM-IV-EL-5 6.25":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HTMR-2.5 6(BLACK)":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HTMR-2.5 6(WHITE)":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HTMR-3 6(BLACK)":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HTMR-3 6(WHITE)":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-QB-B-FW1-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-FW2-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-FW3-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M1-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M2-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M3-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-EL-5 6":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QB-HB-5 6.25":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QBM-EL-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-QBM-G-B-CS-5 6":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QBM-HB-5 6.25":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-R-B-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-B-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-B-256-2":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-B-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-B-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-B-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-36-2IN(3L)":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-1IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-BR-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-BR-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-BR-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-BR-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-W-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-W-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-W-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-W-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-SPC-5LY-B-AO":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-R-SPC-5LY-B-FW":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-R-W-256":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-W-B-HB(EL)-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-W-B-HB(EL)-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-W-B-HB(EL)-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-W-BR-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-W-BR-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-W-BR-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-W-BR-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-S-B-B-HB-2IN(2)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-SB-B-TR-3 6":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"HT-SC-BL-B":{"weightGms":10020.0,"weightKg":10.02,"l":56.1,"w":19.1,"h":100.7},"HT-S-MB-B-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-SPC-5LY-B-AO":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-SPC-5LY-B-FW":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-S-W-B-HB-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-S-W-B-HB-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-W-HB-3L-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"M-B-BL-NS-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"M-BL-BL-BS-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"MBR-2.5X6":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"MBR-3X6":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"M-IV-BL-EL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"M-IV-BL-EL-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"M-IV-BL-EL-6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"MMBF-3X6":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"SW-2L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-TR-BL-BR-3":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"ZJ-8WU3-KVXZ":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-3L-SB-B-GR-RE-3 6":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"HT-M-BS-BL-BL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"HT-R-B-B-256-2IN(3L)":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"SW-3L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-2L-BS-BL-BL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"HT-2L-BS-BL-BL-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-2L-QB-B-OS-5 6":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-3L-QB-B-BL-NV-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0}};
+const SR_SEED = {"HT-KBM-G-B-CS-6 6.25":{"weightGms":50450.0,"weightKg":50.45,"l":184.1,"w":29.2,"h":105.4},"SW-TR-BL-BL-3":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"2L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"2L-IV-BL-EL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"2L-IV-BL-EL-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"2L-IV-BL-EL-6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"3L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"3L-B-BR-TR-3":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HTF-BL-2.5":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HTF-BL-3":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HTFC-T":{"weightGms":10020.0,"weightKg":10.02,"l":56.1,"w":19.1,"h":100.7},"HTF-W-2.5":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HTF-W-3":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-KB-EL-6 6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"HT-KB-HB-6 6.25":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"HT-KBM-EL-6 6":{"weightGms":38450.0,"weightKg":38.45,"l":183.6,"w":16.1,"h":103.0},"HT-KBM-HB-6 6.25":{"weightGms":38450.0,"weightKg":38.45,"l":183.6,"w":16.1,"h":103.0},"HT-MB-B-HB(2)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-B-HB(EL)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-B-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-BL2-256":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HT-M-BS-BL-BL-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-MB-W2-256":{"weightGms":15480.0,"weightKg":15.48,"l":81.5,"w":13.4,"h":100.0},"HT-MB-W2-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-W-HB(EL)-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-MB-W-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-M-QB-B-LG-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-M-QB-B-OS-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-M-QBM-IV-EL-5 6.25":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HTMR-2.5 6(BLACK)":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HTMR-2.5 6(WHITE)":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HTMR-3 6(BLACK)":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HTMR-3 6(WHITE)":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-QB-B-FW1-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-FW2-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-FW3-WM-5 6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M1-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M2-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-B-M3-WM-5X6":{"weightGms":38710.0,"weightKg":38.71,"l":154.0,"w":16.3,"h":110.5},"HT-QB-EL-5 6":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QB-HB-5 6.25":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QBM-EL-5 6":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-QBM-G-B-CS-5 6":{"weightGms":37280.0,"weightKg":37.28,"l":154.1,"w":21.3,"h":104.7},"HT-QBM-HB-5 6.25":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"HT-R-B-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-B-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-B-256-2":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-B-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-B-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-B-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-36-2IN(3L)":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-1IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-B-HB(EL)-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-BR-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-BR-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-BR-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-BR-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-B-W-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-B-W-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-B-W-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-B-W-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-SPC-5LY-B-AO":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-R-SPC-5LY-B-FW":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-R-W-256":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-W-B-HB(EL)-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-W-B-HB(EL)-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-W-B-HB(EL)-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-R-W-BR-256-1IN":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"HT-R-W-BR-256-2IN":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"HT-R-W-BR-36-1IN":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-R-W-BR-36-2IN":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-S-B-B-HB-2IN(2)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-2IN(3L)-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-B-B-HB-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-SB-B-TR-3 6":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"HT-SC-BL-B":{"weightGms":10020.0,"weightKg":10.02,"l":56.1,"w":19.1,"h":100.7},"HT-S-MB-B-HB-36":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-SPC-5LY-B-AO":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-SPC-5LY-B-FW":{"weightGms":12340.0,"weightKg":12.34,"l":88.0,"w":39.0,"h":19.4},"HT-S-W-B-HB-1IN-36":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"HT-S-W-B-HB-2IN-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"HT-S-W-HB-3L-36":{"weightGms":25420.0,"weightKg":25.42,"l":93.0,"w":18.6,"h":99.8},"M-B-BL-NS-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"M-BL-BL-BS-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"MBR-2.5X6":{"weightGms":20940.0,"weightKg":20.94,"l":80.2,"w":19.2,"h":98.6},"MBR-3X6":{"weightGms":24710.0,"weightKg":24.71,"l":93.5,"w":18.7,"h":100.0},"M-IV-BL-EL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"M-IV-BL-EL-5":{"weightGms":27460.0,"weightKg":27.46,"l":153.8,"w":15.0,"h":104.9},"M-IV-BL-EL-6":{"weightGms":47100.0,"weightKg":47.1,"l":184.1,"w":20.6,"h":102.0},"MMBF-3X6":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"SW-2L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-2L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-3L-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-FW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW1-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW2-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"SW-TR-BL-BR-3":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"ZJ-8WU3-KVXZ":{"weightGms":17300.0,"weightKg":17.3,"l":93.9,"w":13.3,"h":99.8},"HT-3L-SB-B-GR-RE-3 6":{"weightGms":30130.0,"weightKg":30.13,"l":98.0,"w":25.7,"h":105.0},"HT-M-BS-BL-BL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"HT-R-B-B-256-2IN(3L)":{"weightGms":21970.0,"weightKg":21.97,"l":81.0,"w":23.4,"h":99.3},"SW-3L-B-BL-HW3-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-2L-BS-BL-BL-4":{"weightGms":32870.0,"weightKg":32.87,"l":124.5,"w":21.4,"h":103.2},"HT-2L-BS-BL-BL-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-2L-QB-B-OS-5 6":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0},"HT-3L-QB-B-BL-NV-5":{"weightGms":46890.0,"weightKg":46.89,"l":154.0,"w":25.6,"h":105.0}};
+
+// Live tables — start from seed, overwritten by Drive on load
+let BD_DIMS = Object.assign({}, BD_SEED);
+let SR_DIMS = Object.assign({}, SR_SEED);
+
 
 function lookupBDDim(sku) { return BD_DIMS[sku] || BD_DIMS[(sku||'').trim()] || null; }
 function lookupSRDim(sku) { return SR_DIMS[sku] || SR_DIMS[(sku||'').trim()] || null; }
@@ -2996,6 +3336,13 @@ async function driveLoadAll() {
       DB.guardrails = { ...DB.guardrails, ...cfgData.guardrails };
     }
 
+    // Load dimension tables — merge Drive data over seed
+    const bdData = await readFile(DRIVE_CONFIG.BD_DIMS_FILE);
+    if (bdData) BD_DIMS = Object.assign({}, BD_SEED, bdData);
+
+    const srData = await readFile(DRIVE_CONFIG.SR_DIMS_FILE);
+    if (srData) SR_DIMS = Object.assign({}, SR_SEED, srData);
+
     saveLocalFallback();
     setSyncState('ok', 'Loaded from Drive');
   } catch(e) {
@@ -3020,6 +3367,18 @@ async function driveSaveDB() {
     setSyncState('err', 'Save error');
     console.error('Drive save error:', e);
   }
+}
+
+
+// ── SAVE DIMS TO DRIVE ───────────────────────────────────────────────────────
+async function driveSaveBDDims() {
+  if (!gToken) return;
+  try { await writeFile(DRIVE_CONFIG.BD_DIMS_FILE, BD_DIMS); setSyncState("ok","BD dims saved"); } catch(e) { console.error("BD dims save error:", e); }
+}
+
+async function driveSaveSRDims() {
+  if (!gToken) return;
+  try { await writeFile(DRIVE_CONFIG.SR_DIMS_FILE, SR_DIMS); setSyncState("ok","SR dims saved"); } catch(e) { console.error("SR dims save error:", e); }
 }
 
 // ── SAVE CONFIG TO DRIVE ────────────────────────────────────────
