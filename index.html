@@ -875,6 +875,13 @@
         <option value="delhivery">Delhivery</option>
         <option value="unassigned">Unassigned</option>
       </select>
+      <select class="filter-select" onchange="applyFilters()" id="filter-status">
+        <option value="">All Orders</option>
+        <option value="active">Active only</option>
+        <option value="tracked">Tracked</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="unserviceable">Unserviceable</option>
+      </select>
       <button class="btn btn-secondary btn-sm" onclick="exportMasterCSV()">⬇ Export CSV</button>
     </div>
     <div style="overflow-x:auto;">
@@ -890,11 +897,12 @@
             <th>Payment</th>
             <th>Amount (₹)</th>
             <th>Courier</th>
-            <th>Suggest Reason</th>
+            <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="orders-tbody">
-          <tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No orders yet</div><div class="empty-sub">Upload orders from the Upload tab</div></div></td></tr>
+          <tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No orders yet</div><div class="empty-sub">Upload orders from the Upload tab</div></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -1754,8 +1762,15 @@ function mergeOrders(result, platform, fileName, statusEl) {
   }
 
   let newAdded = 0, dupes = 0;
+  const cancelledConflicts = []; // orders in upload that exist as cancelled/unserviceable
+
   result.orders.forEach(o => {
-    if (DB.orders.find(x => x.orderId === o.orderId && x.platform === platform)) {
+    const existing = DB.orders.find(x => x.orderId === o.orderId && x.platform === platform);
+    if (existing) {
+      // Check if existing is cancelled/unserviceable — flag for user prompt
+      if (existing.status === 'cancelled' || existing.status === 'unserviceable') {
+        cancelledConflicts.push({ orderId: o.orderId, existingStatus: existing.status, newOrder: o, existingIdx: DB.orders.indexOf(existing) });
+      }
       dupes++;
     } else {
       const s = suggestCourier(o);
@@ -1768,6 +1783,25 @@ function mergeOrders(result, platform, fileName, statusEl) {
   });
 
   DB.uploadHistory.unshift({ platform, fileName, parsed: result.orders.length, added: newAdded, dupes, time: new Date().toLocaleTimeString() });
+  // Prompt user about cancelled/unserviceable orders that reappeared
+  if (cancelledConflicts.length > 0) {
+    const listStr = cancelledConflicts.slice(0, 5).map(c => `• ${c.orderId} (${c.existingStatus})`).join('\n');
+    const more = cancelledConflicts.length > 5 ? `\n...and ${cancelledConflicts.length - 5} more` : '';
+    const msg = `${cancelledConflicts.length} order(s) in this upload were previously marked as ${cancelledConflicts[0].existingStatus}:\n\n${listStr}${more}\n\nReinstate these orders and put them back in the assign queue?`;
+    if (confirm(msg)) {
+      cancelledConflicts.forEach(({ existingIdx }) => {
+        const o = DB.orders[existingIdx];
+        const s = suggestCourier(o);
+        o.status = 'pending';
+        o.courier = s.courier;
+        o.suggestedCourier = s.courier;
+        o.suggestReason = s.reason;
+        o.manualOverride = false;
+      });
+      toast(`✓ ${cancelledConflicts.length} orders reinstated`, 'success');
+    }
+  }
+
   saveLocalFallback();
   updateHeaderStats();
   renderUploadHistory();
@@ -1801,14 +1835,28 @@ function filterByPlatform() { applyFilters(); }
 function filterByCourier() { applyFilters(); }
 
 function applyFilters() {
-  const q = (document.getElementById('order-search') || {}).value || '';
-  const plat = (document.getElementById('filter-platform') || {}).value || '';
+  const q    = (document.getElementById('order-search')  || {}).value || '';
+  const plat = (document.getElementById('filter-platform')|| {}).value || '';
   const cour = (document.getElementById('filter-courier') || {}).value || '';
+  const stat = (document.getElementById('filter-status') || {}).value || '';
 
   visibleOrders = DB.orders.filter(o => {
+    // Platform filter
     if (plat && o.platform !== plat) return false;
+    // Courier filter
     if (cour === 'unassigned' && o.courier) return false;
     if (cour && cour !== 'unassigned' && o.courier !== cour) return false;
+    // Status filter
+    if (stat === 'active') {
+      if (o.status === 'cancelled' || o.status === 'unserviceable') return false;
+    } else if (stat === 'tracked') {
+      if (o.status !== 'tracked') return false;
+    } else if (stat === 'cancelled') {
+      if (o.status !== 'cancelled') return false;
+    } else if (stat === 'unserviceable') {
+      if (o.status !== 'unserviceable') return false;
+    }
+    // Search
     if (q) {
       const ql = q.toLowerCase();
       return o.orderId.toLowerCase().includes(ql) ||
@@ -1830,7 +1878,7 @@ function renderOrdersTable() {
   const slice = visibleOrders.slice(start, start + PAGE_SIZE);
 
   if (slice.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No orders</div><div class="empty-sub">Upload orders from the Upload tab</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">No orders</div><div class="empty-sub">Upload orders from the Upload tab</div></div></td></tr>`;
     document.getElementById('orders-pagination').style.display = 'none';
     return;
   }
@@ -1839,7 +1887,12 @@ function renderOrdersTable() {
     const courier = o.courier
       ? `<span class="badge badge-${o.courier}">${o.courier === 'bluedart' ? '🔵' : '🔴'} ${o.courier}</span>`
       : `<span class="badge badge-pending">⏳ pending</span>`;
-    return `<tr>
+    const canReinstate = o.status === 'cancelled' || o.status === 'unserviceable';
+    const globalIdx = DB.orders.indexOf(o);
+    const actionCell = canReinstate
+      ? `<td><button class="btn btn-sm" style="background:var(--green-bg);color:var(--green);border:1px solid #bbf7d0;font-size:11px;" onclick="reinstateOrder(${globalIdx})">↩ Reinstate</button></td>`
+      : `<td></td>`;
+    return `<tr style="${canReinstate ? 'opacity:0.55;' : ''}">
       <td style="color:var(--text3)">${start + i + 1}</td>
       <td class="bold">${o.orderId}</td>
       <td><span class="badge badge-${o.platform}">${o.platform}</span></td>
@@ -1849,7 +1902,8 @@ function renderOrdersTable() {
       <td><span class="badge badge-${o.paymentType}">${o.paymentType.toUpperCase()}</span></td>
       <td>₹${(o.amount || 0).toLocaleString('en-IN')}</td>
       <td>${courier}</td>
-      <td style="color:var(--text3)">${getSuggestLabel(o.suggestReason)}</td>
+      <td>${statusBadge(o)}</td>
+      ${actionCell}
     </tr>`;
   }).join('');
 
@@ -1882,6 +1936,28 @@ function renderOrdersTable() {
 
 // ─────────────────────────────────────────────
 // RENDER: ASSIGN
+
+// ─────────────────────────────────────────────
+// REINSTATE — bring cancelled/unserviceable back into assign flow
+// ─────────────────────────────────────────────
+function reinstateOrder(idx) {
+  if (!driveReady('reinstating order')) return;
+  const o = DB.orders[idx];
+  if (!o) return;
+  if (!confirm(`Reinstate order ${o.orderId}? It will re-enter the assign queue.`)) return;
+  // Re-run courier suggestion
+  const s = suggestCourier(o);
+  o.status = 'pending';
+  o.courier = s.courier;
+  o.suggestedCourier = s.courier;
+  o.suggestReason = s.reason;
+  o.manualOverride = false;
+  saveState();
+  updateHeaderStats();
+  applyFilters();
+  toast(`✓ Order ${o.orderId} reinstated → back in assign queue`, 'success');
+}
+
 // ─────────────────────────────────────────────
 // STATUS HELPERS
 // ─────────────────────────────────────────────
